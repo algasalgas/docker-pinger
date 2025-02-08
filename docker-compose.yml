@@ -1,0 +1,60 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: container_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: container_db
+      DB_USER: user
+      DB_PASS: password
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+
+  pinger:
+    build:
+      context: ./pinger
+    environment:
+      # Здесь укажите IP-адреса контейнеров, которые нужно пинговать (пример – поменяйте на актуальные)
+      CONTAINER_IPS: ${CONTAINER_IPS}
+      BACKEND_URL: "http://backend:8080"
+      PING_INTERVAL: ${PING_INTERVAL}
+    depends_on:
+      - backend
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_PING_INTERVAL: ${PING_INTERVAL}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
